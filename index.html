@@ -194,6 +194,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
+            position: relative;
         }
 
         .chat-header-avatar {
@@ -207,6 +208,10 @@
             font-size: 24px;
         }
 
+        .chat-header-info {
+            flex: 1;
+        }
+
         .chat-header-info h2 {
             font-size: 17px;
             font-weight: 600;
@@ -215,6 +220,92 @@
         .chat-header-info p {
             font-size: 12px;
             opacity: 0.8;
+        }
+
+        /* 剩余次数显示 */
+        .quota-badge {
+            position: absolute;
+            top: calc(12px + var(--safe-area-top));
+            right: 16px;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .quota-badge.warning {
+            background: #ff6b6b;
+        }
+
+        .quota-badge.limit {
+            background: #ff4757;
+        }
+
+        /* 消耗统计弹窗 */
+        .stats-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .stats-popup.show {
+            display: flex;
+        }
+
+        .stats-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin: 20px;
+            width: calc(100% - 40px);
+            max-width: 320px;
+        }
+
+        .stats-card h3 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .stats-item:last-child {
+            border-bottom: none;
+        }
+
+        .stats-label {
+            color: #666;
+        }
+
+        .stats-value {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .stats-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            margin-top: 16px;
+            cursor: pointer;
         }
 
         .chat-messages {
@@ -457,6 +548,34 @@
                 <h2>瓦力小智</h2>
                 <p id="statusText">在线</p>
             </div>
+            <div class="quota-badge" id="quotaBadge" onclick="showStats()">
+                <span>📊</span>
+                <span id="quotaText">50次/天</span>
+            </div>
+        </div>
+
+        <!-- 消耗统计弹窗 -->
+        <div class="stats-popup" id="statsPopup">
+            <div class="stats-card">
+                <h3>📊 今日消耗统计</h3>
+                <div class="stats-item">
+                    <span class="stats-label">今日对话</span>
+                    <span class="stats-value" id="statCount">0 次</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-label">剩余次数</span>
+                    <span class="stats-value" id="statRemaining">50 次</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-label">估算Token</span>
+                    <span class="stats-value" id="statTokens">0</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-label">估算积分消耗</span>
+                    <span class="stats-value" id="statCost">0</span>
+                </div>
+                <button class="stats-btn" onclick="closeStats()">知道了</button>
+            </div>
         </div>
         
         <div class="chat-messages" id="chatMessages">
@@ -481,6 +600,8 @@
         let currentUser = null;
         let sessionId = null;
         let countdownTimer = null;
+        let remainingQuota = 50; // 每日剩余次数
+        let dailyLimit = 50;
 
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
@@ -605,6 +726,7 @@
         function showChat() {
             document.getElementById('loginContainer').classList.add('hidden');
             document.getElementById('chatContainer').classList.add('active');
+            fetchUserStats(); // 获取用户统计
         }
 
         // 发送消息
@@ -644,8 +766,16 @@
                 
                 if (data.success) {
                     addMessage('bot', data.reply);
+                    // 更新每日剩余次数
+                    if (data.remaining_today !== undefined) {
+                        remainingQuota = data.remaining_today;
+                        updateQuotaDisplay();
+                    }
                 } else {
                     addMessage('bot', data.message || '抱歉，出了点小问题，请重试~');
+                    if (data.code === 'QUOTA_EXCEEDED') {
+                        addMessage('bot', '今日对话次数已用完，明天再来吧~ 🌙');
+                    }
                 }
             } catch (e) {
                 document.getElementById(typingId)?.remove();
@@ -705,6 +835,39 @@
         function autoResize(el) {
             el.style.height = 'auto';
             el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+        }
+        
+        // 更新配额显示
+        function updateQuotaDisplay() {
+            const badge = document.getElementById('quotaBadge');
+            if (badge) {
+                if (remainingQuota <= 0) {
+                    badge.textContent = '今日已用完';
+                    badge.className = 'quota-badge danger';
+                } else if (remainingQuota <= 10) {
+                    badge.textContent = `剩余 ${remainingQuota} 次`;
+                    badge.className = 'quota-badge warning';
+                } else {
+                    badge.textContent = `剩余 ${remainingQuota} 次`;
+                    badge.className = 'quota-badge normal';
+                }
+            }
+        }
+        
+        // 获取用户统计信息
+        async function fetchUserStats() {
+            if (!currentUser?.stu_id) return;
+            try {
+                const res = await fetch(`${API_BASE}/mobile/api/stats/${currentUser.stu_id}`);
+                const data = await res.json();
+                if (data.success && data.stats) {
+                    remainingQuota = data.stats.remaining_today || dailyLimit;
+                    dailyLimit = data.stats.daily_limit || 50;
+                    updateQuotaDisplay();
+                }
+            } catch (e) {
+                console.log('获取统计失败');
+            }
         }
 
         // 退出登录
