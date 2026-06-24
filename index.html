@@ -637,7 +637,7 @@
             btn.disabled = true;
             
             try {
-                const res = await fetch(`${API_BASE}/mobile/api/send_code`, {
+                const res = await fetch(`${API_BASE}/mobile/send_code`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ phone })
@@ -696,7 +696,7 @@
             btn.textContent = '登录中...';
             
             try {
-                const res = await fetch(`${API_BASE}/mobile/api/login`, {
+                const res = await fetch(`${API_BASE}/mobile/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ phone, code })
@@ -749,7 +749,7 @@
             sendBtn.disabled = true;
             
             try {
-                const res = await fetch(`${API_BASE}/mobile/api/chat`, {
+                const res = await fetch(`${API_BASE}/mobile/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -858,7 +858,7 @@
         async function fetchUserStats() {
             if (!currentUser?.stu_id) return;
             try {
-                const res = await fetch(`${API_BASE}/mobile/api/stats/${currentUser.stu_id}`);
+                const res = await fetch(`${API_BASE}/mobile/stats/${currentUser.stu_id}`);
                 const data = await res.json();
                 if (data.success && data.stats) {
                     remainingQuota = data.stats.remaining_today || dailyLimit;
